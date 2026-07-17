@@ -2,17 +2,15 @@ import ExcelJS from "exceljs";
 import { ErroAuditoria } from "./tipos";
 
 
-function colunaNumero(coluna:string){
+function colunaNumero(coluna: string): number {
 
     let numero = 0;
 
-    for(let i = 0; i < coluna.length; i++){
+    for (const letra of coluna.toUpperCase()) {
 
         numero =
-        numero * 26 +
-        coluna
-        .toUpperCase()
-        .charCodeAt(i) - 64;
+            numero * 26 +
+            letra.charCodeAt(0) - 64;
 
     }
 
@@ -24,80 +22,106 @@ function colunaNumero(coluna:string){
 
 export async function marcarErros(
 
-    planilha:ExcelJS.Worksheet,
+    planilha: ExcelJS.Worksheet,
 
-    erros:ErroAuditoria[]
+    erros: ErroAuditoria[]
 
-){
-
-
-    console.log(
-        "MARCAÇÃO DE ERROS:",
-        erros.length
-    );
+) {
 
 
-    for(const erro of erros){
+    for (const erro of erros) {
 
 
         const linha =
-        Number(erro.linha);
+            Number(erro.linha);
 
 
         const coluna =
-        colunaNumero(
-            erro.coluna
-        );
+            colunaNumero(erro.coluna);
 
 
 
-        console.log(
-            "Pintando:",
-            linha,
-            coluna,
-            erro.campo
-        );
+        if (
+            linha <= 1 ||
+            coluna <= 0
+        ) {
+            continue;
+        }
 
 
 
         const celula =
-        planilha
-        .getCell(
-            linha,
-            coluna
-        );
+            planilha
+                .getRow(linha)
+                .getCell(coluna);
 
 
 
-        // cria uma cópia do estilo somente da célula
+        // remove qualquer estilo de preenchimento herdado
 
         celula.fill = {
-            type:"pattern",
-            pattern:"solid",
-            fgColor:{
-                argb:"FFFF0000"
-            }
+            type: "pattern",
+            pattern: "none"
         };
 
 
-        celula.font = {
-            bold:true,
-            color:{
-                argb:"FFFFFFFF"
+
+        // aplica vermelho APENAS nessa célula
+        console.log(
+            "PINTANDO CÉLULA:",
+            celula.address
+        );
+
+        celula.fill = {
+
+            type: "pattern",
+
+            pattern: "solid",
+
+            fgColor: {
+                argb: "FFFF0000"
             }
+
+        };
+
+
+
+        celula.font = {
+
+            name: "Calibri",
+
+            size: 11,
+
+            bold: true,
+
+            color: {
+                argb: "FFFFFFFF"
+            }
+
+        };
+
+
+        celula.alignment = {
+
+            vertical: "middle",
+
+            horizontal: "center"
+
         };
 
 
         celula.note =
-        `${erro.campo}
+            `
+Campo: ${erro.campo}
 
+Erro:
 ${erro.mensagem}
 
 Valor:
-${erro.valorEncontrado}`;
+${erro.valorEncontrado}
+        `;
 
 
     }
-
 
 }

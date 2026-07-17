@@ -26,9 +26,13 @@ new ExcelJS.Workbook();
 
 
 await workbook.xlsx.load(
-    arquivoOriginal
+    arquivoOriginal,
+    {
+        ignoreNodes:[
+            "extLst"
+        ]
+    }
 );
-
 
 
 const planilha =
