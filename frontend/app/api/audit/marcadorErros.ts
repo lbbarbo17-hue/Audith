@@ -2,15 +2,16 @@ import ExcelJS from "exceljs";
 import { ErroAuditoria } from "./tipos";
 
 
-function colunaNumero(coluna: string): number {
+function converterColunaParaNumero(coluna:string){
 
     let numero = 0;
 
-    for (const letra of coluna.toUpperCase()) {
+    for(let i = 0; i < coluna.length; i++){
 
         numero =
-            numero * 26 +
-            letra.charCodeAt(0) - 64;
+        numero * 26 +
+        coluna.charCodeAt(i) -
+        64;
 
     }
 
@@ -21,106 +22,73 @@ function colunaNumero(coluna: string): number {
 
 
 export async function marcarErros(
-
     planilha: ExcelJS.Worksheet,
-
     erros: ErroAuditoria[]
+){
 
-) {
-
-
-    for (const erro of erros) {
+    for(const erro of erros){
 
 
         const linha =
-            Number(erro.linha);
+        Number(erro.linha);
 
 
         const coluna =
-            colunaNumero(erro.coluna);
+        converterColunaParaNumero(
+            erro.coluna
+        );
 
 
-
-        if (
-            linha <= 1 ||
-            coluna <= 0
-        ) {
+        if(
+            !linha ||
+            !coluna
+        ){
             continue;
         }
 
 
-
         const celula =
-            planilha
-                .getRow(linha)
-                .getCell(coluna);
-
-
-
-        // remove qualquer estilo de preenchimento herdado
-
-        celula.fill = {
-            type: "pattern",
-            pattern: "none"
-        };
-
-
-
-        // aplica vermelho APENAS nessa célula
-        console.log(
-            "PINTANDO CÉLULA:",
-            celula.address
+        planilha.getCell(
+            linha,
+            coluna
         );
 
+
         celula.fill = {
 
-            type: "pattern",
+            type:"pattern",
 
-            pattern: "solid",
+            pattern:"solid",
 
-            fgColor: {
-                argb: "FFFF0000"
+            fgColor:{
+                argb:"FFFF0000"
             }
 
         };
-
 
 
         celula.font = {
 
-            name: "Calibri",
+            bold:true,
 
-            size: 11,
-
-            bold: true,
-
-            color: {
-                argb: "FFFFFFFF"
+            color:{
+                argb:"FFFFFFFF"
             }
-
-        };
-
-
-        celula.alignment = {
-
-            vertical: "middle",
-
-            horizontal: "center"
 
         };
 
 
         celula.note =
-            `
-Campo: ${erro.campo}
-
+`
 Erro:
 ${erro.mensagem}
 
+Campo:
+${erro.campo}
+
 Valor:
 ${erro.valorEncontrado}
-        `;
-
+`;
 
     }
 
