@@ -92,12 +92,25 @@ export default function ApexCorporateAudit() {
     formData.append("relatorio", files.relatorio);
 
     try {
-      const response = await fetch("/api/audit", {
-        method: "POST",
-        body: formData
-      });
+      const response = await fetch("http://localhost:5678/webhook-test/Audith", {
+      method: "POST",
+      body: formData
+});
 
-      const data = await response.json();
+      // Lemos a resposta como texto primeiro para o site NUNCA mais quebrar
+const textResponse = await response.text(); 
+
+console.log("=== RESPOSTA BRUTA DO N8N ===", textResponse);
+
+if (!textResponse || textResponse.trim() === "") {
+    console.warn("O n8n processou, mas devolveu uma resposta vazia.");
+    // Aqui você pode colocar um aviso amigável na tela se quiser
+    setLoading(false);
+    return;
+}
+
+// Só tenta transformar em JSON se tiver texto de verdade dentro
+const data = JSON.parse(textResponse);
 
       if (!response.ok) {
         throw new Error(data.erro || "Erro ao executar auditoria.");
@@ -108,6 +121,7 @@ export default function ApexCorporateAudit() {
       // ===============================
       // DOWNLOAD DO EXCEL
       // ===============================
+    if (data && data.arquivo) { 
       const byteCharacters = atob(data.arquivo);
       const byteNumbers = new Array(byteCharacters.length);
 
@@ -128,7 +142,7 @@ export default function ApexCorporateAudit() {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-
+    }
     } catch (error) {
       console.error("Erro na comunicação com API:", error);
       alert("Erro ao processar auditoria.");
