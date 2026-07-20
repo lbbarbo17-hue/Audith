@@ -1,112 +1,54 @@
-import ExcelJS from "exceljs";
+// Exemplo de correção para o bloco de estilização do seu gerador Excel
+export async function gerarExcelResultado(bufferOriginal: ArrayBuffer, dadosAuditoria: { totalAnalises: number, erros: any[] }) {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(bufferOriginal);
+  const sheet = workbook.getWorksheet(1); // Pega a primeira aba
 
-import {
-    ResultadoAuditoria
-} from "./tipos";
+  // 1. FORÇAR A CORRETUDE DOS CABEÇALHOS (Linha 1) CONFORME O PRD VISUAL
+  const layoutCores: Record<string, string> = {
+    // Laranja: Obrigatório + Formato Estrito
+    "A1": "FFE5CC", "B1": "FFE5CC", "D1": "FFE5CC",
+    // Azul: Opcional Livre
+    "C1": "DDEBF7",
+    // Amarelo: Obrigatório Simples
+    "E1": "FFF2CC", "F1": "FFF2CC",
+    // Verde: Opcional com Formato/Regras
+    "G1": "E2EFDA", "H1": "E2EFDA", "I1": "E2EFDA", "J1": "E2EFDA", "K1": "E2EFDA",
+    "L1": "E2EFDA", "M1": "E2EFDA", "N1": "E2EFDA", "O1": "E2EFDA", "P1": "E2EFDA",
+    "Q1": "E2EFDA", "R1": "E2EFDA", "S1": "E2EFDA", "T1": "E2EFDA"
+  };
 
-import {
-    marcarErros
-} from "./marcadorErros";
+  // Aplica as cores de identificação no cabeçalho para que ele nunca volte branco
+  Object.entries(layoutCores).forEach(([celula, corHex]) => {
+    const cell = sheet.getCell(celula);
+    cell.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: corHex }
+    };
+    cell.font = { bold: true, color: { argb: "000000" } };
+  });
 
+  // 2. CORREÇÃO DO BUG: Pintar EM VERMELHO puramente as células que falharam
+  // Evita o efeito cascata ou blocos gigantes desalinhados
+  dadosAuditoria.erros.forEach(erro => {
+    // Garanta que a letra da coluna exista e seja válida (A-T)
+    if (erro.coluna && /^[A-T]$/.test(erro.coluna.toUpperCase()) && erro.linha) {
+      const enderecoCelula = `${erro.coluna.toUpperCase()}${erro.linha}`;
+      const cell = sheet.getCell(enderecoCelula);
 
+      // Aplica o vermelho suave de erro apenas nesta coordenada cirúrgica
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFC7CE' } // Fundo vermelho claro
+      };
+      cell.font = {
+        color: { argb: '9C0006' }, // Texto vermelho escuro
+        bold: true
+      };
+    }
+  });
 
-export async function gerarExcelResultado(
-
-    arquivoOriginal:ArrayBuffer,
-
-    resultado:ResultadoAuditoria
-
-):Promise<Buffer>{
-
-
-
-    const workbookOriginal =
-        new ExcelJS.Workbook();
-
-
-    await workbookOriginal.xlsx.load(
-        arquivoOriginal
-    );
-
-
-    const planilhaOriginal =
-        workbookOriginal.worksheets[0];
-
-
-
-    const novoWorkbook =
-        new ExcelJS.Workbook();
-
-
-
-    const novaPlanilha =
-        novoWorkbook.addWorksheet(
-            planilhaOriginal.name
-        );
-
-
-
-    // copia somente valores
-
-    planilhaOriginal.eachRow(
-        (row,rowNumber)=>{
-
-
-            const novaLinha =
-                novaPlanilha.getRow(rowNumber);
-
-
-
-            row.eachCell(
-                (cell,colNumber)=>{
-
-
-                    novaLinha
-                    .getCell(colNumber)
-                    .value =
-                    cell.value;
-
-
-                }
-            );
-
-
-        }
-    );
-
-
-
-    // copia largura das colunas
-
-    planilhaOriginal.columns.forEach(
-        (col,index)=>{
-
-
-            novaPlanilha
-            .getColumn(index+1)
-            .width =
-            col.width || 15;
-
-
-        }
-    );
-
-
-
-    // aplica somente os erros
-
-    await marcarErros(
-        novaPlanilha,
-        resultado.erros
-    );
-
-
-
-    const buffer =
-        await novoWorkbook.xlsx.writeBuffer();
-
-
-
-    return Buffer.from(buffer);
-
+  return await workbook.xlsx.writeBuffer();
 }

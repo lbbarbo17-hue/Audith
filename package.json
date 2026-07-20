@@ -4,6 +4,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@types/exceljs": "^0.5.3",
     "@types/node": "^26.1.1"
   }
 }

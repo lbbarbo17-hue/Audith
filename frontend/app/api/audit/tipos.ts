@@ -1,114 +1,45 @@
-// frontend/app/api/audit/tipos.ts
-
-
 export interface HoleriteLinha {
-
-    linhaPlanilha: number;
-
-    cpf: string;
-
-    cnpj: string;
-
-    dataAdmissao: string;
-
-    matricula: string;
-
-    codigoVerba: string;
-
+  linhaPlanilha: number;
+  cpf: string;
+  cnpj: string;
+  cnpjTomador?: string;
+  dataAdmissao: string;
+  matricula: string;
+  tipoFolha: string;
+  dataPagamento?: string;
+  mes?: string;
+  ano?: string;
+  qtdeDependentesIrrf?: string;
+  qtdeDependentesSf?: string;
+  codigoVerba: string;
+  descricaoVerba?: string;
+  naturezaVerba?: string;
+  percentualVerba?: string;
+  quantidadeReferencia?: string;
+  valorVerba?: string;
+  incidenciaInss?: string;
+  incidenciaIrrf?: string;
+  incidenciaFgts?: string;
 }
-
-
 
 export interface FuncionarioRelatorio {
-
-    cnpjRegistro: string;
-
-    matricula: string;
-
-    cpf: string;
-
-    dataAdmissao: string;
-
+  cnpjRegistro: string;
+  matricula: string;
+  cpf: string;
+  dataAdmissao: string;
 }
-
-
 
 export interface DeParaVerba {
-
-    codigoCliente: string;
-
-    codigoWfp: string;
-
+  codigoCliente: string;
+  codigoWfp: string;
 }
-
-
-
-export type CategoriaErro =
-
-    | "cpf_invalido"
-
-    | "cpf_nao_encontrado"
-
-    | "cnpj_invalido"
-
-    | "cnpj_divergente"
-
-    | "data_invalida"
-
-    | "admissao_divergente"
-
-    | "matricula_divergente"
-
-    | "campo_obrigatorio"
-
-    | "verba_nao_cadastrada"
-
-    | "duplicidade_depara"
-
-    | "ficha_registro_suspeita";
-
-
-
-
 
 export interface ErroAuditoria {
-
-    linha:number;
-
-    coluna:string;
-
-    campo:string;
-
-    valorEncontrado:string;
-
-    valorEsperado?:string;
-
-    mensagem:string;
-
-    categoria:
-    | "cpf_invalido"
-    | "cpf_nao_encontrado"
-    | "cnpj_invalido"
-    | "cnpj_divergente"
-    | "data_invalida"
-    | "admissao_divergente"
-    | "matricula_divergente"
-    | "campo_obrigatorio"
-    | "verba_nao_cadastrada"
-    | "duplicidade_depara";
-
-
-    sugestao?:string;
-
-}
-
-
-
-
-export interface ResultadoAuditoria {
-
-    totalAnalises: number;
-
-    erros: ErroAuditoria[];
-
+  linha: number;
+  coluna: string; // Deixe como string simples para receber a letra dinamicamente
+  campo: string;
+  valorEncontrado: string;
+  valorEsperado?: string;
+  mensagem: string;
+  categoria: string; // Alterado para string simples para evitar erro de atribuição estrita
 }
