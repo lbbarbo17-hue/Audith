@@ -24,17 +24,43 @@ export function campoObrigatorio(
     - 11 números
 */
 
-export function validarCPF(
-    cpf:string
-):boolean {
+export function validarCPF(cpf: string): boolean {
+  if (!cpf) return false;
+  
+  const cpfLimpo = cpf.replace(/[\.\-\s]/g, "").toUpperCase();
 
+  // Verifica se tem o tamanho padrão de um CPF (11 caracteres)
+  if (cpfLimpo.length !== 11) return false;
 
-    const somenteNumeros =
-        cpf.replace(/\D/g,"");
+  // Se possuir alguma LETRA (A-Z), tratamos como CPF Alfanumérico válido
+  if (/[A-Z]/.test(cpfLimpo)) {
+    return true; 
+  }
 
+  // Se for puramente numérico, aplica a validação tradicional de dígitos
+  if (/^(\d)\1{10}$/.test(cpfLimpo)) return false; // Elimina sequências repetidas como 111.111.111-11
 
-    return somenteNumeros.length === 11;
+  let soma = 0;
+  let resto;
 
+  for (let i = 1; i <= 9; i++) {
+    soma = soma + parseInt(cpfLimpo.substring(i - 1, i)) * (11 - i);
+  }
+  resto = (soma * 10) % 11;
+
+  if (resto === 10 || resto === 11) resto = 0;
+  if (resto !== parseInt(cpfLimpo.substring(9, 10))) return false;
+
+  soma = 0;
+  for (let i = 1; i <= 10; i++) {
+    soma = soma + parseInt(cpfLimpo.substring(i - 1, i)) * (12 - i);
+  }
+  resto = (soma * 10) % 11;
+
+  if (resto === 10 || resto === 11) resto = 0;
+  if (resto !== parseInt(cpfLimpo.substring(10, 11))) return false;
+
+  return true;
 }
 
 

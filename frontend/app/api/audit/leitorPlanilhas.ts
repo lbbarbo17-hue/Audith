@@ -1,34 +1,14 @@
 import ExcelJS from "exceljs";
+import { HoleriteLinha, FuncionarioRelatorio, DeParaVerba } from "./tipos";
+import { normalizarCPF, normalizarCNPJ, normalizarMatricula, normalizarCodigoVerba, normalizarData } from "./utils";
 
-import {
-  HoleriteLinha,
-  FuncionarioRelatorio,
-  DeParaVerba
-} from "./tipos";
-
-import {
-  normalizarCPF,
-  normalizarCNPJ,
-  normalizarMatricula,
-  normalizarCodigoVerba,
-  normalizarData
-} from "./utils";
-
-function valorCelula(valor: any): string {
-  if (valor === null || valor === undefined) {
-    return "";
-  }
-  if (valor instanceof Date) {
-    // Retorna no formato YYYY-MM-DD para simplificar normalizações de data
-    return valor.toISOString().split('T')[0];
-  }
-  if (typeof valor === "object" && "text" in valor) {
-    return String(valor.text).trim();
-  }
+function valorCelula(valor: unknown): string {
+  if (valor === null || valor === undefined) return "";
+  if (valor instanceof Date) return valor.toISOString().split('T')[0];
+  if (typeof valor === "object" && "text" in valor) return String((valor as { text: unknown }).text).trim();
   return String(valor).trim();
 }
 
-// Auxiliar dinâmico para encontrar os índices reais das colunas pelos nomes
 function mapearCabecalhos(row: ExcelJS.Row): Record<string, number> {
   const mapa: Record<string, number> = {};
   row.eachCell((cell, colNumber) => {
@@ -38,20 +18,14 @@ function mapearCabecalhos(row: ExcelJS.Row): Record<string, number> {
   return mapa;
 }
 
-/*
-=========================
-HOLERITE
-=========================
-*/
 export async function lerHolerite(file: File): Promise<HoleriteLinha[]> {
-  const buffer = await file.arrayBuffer();
+  const arrayBuffer = await file.arrayBuffer();
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
+  
+  await workbook.xlsx.load(arrayBuffer);
   const sheet = workbook.getWorksheet(1);
 
-  if (!sheet) {
-    throw new Error("Planilha Holerite não encontrada.");
-  }
+  if (!sheet) throw new Error("Planilha Holerite não encontrada.");
 
   const dados: HoleriteLinha[] = [];
   let mapaColunas: Record<string, number> = {};
@@ -62,48 +36,55 @@ export async function lerHolerite(file: File): Promise<HoleriteLinha[]> {
       return;
     }
 
-    // Identificar dinamicamente as colunas comuns ou mapear por fallback se não achar o nome
     const colCpf = mapaColunas["CPF"] || 1;
     const colCnpj = mapaColunas["CNPJ"] || 2;
     const colData = mapaColunas["DATA ADMISSÃO"] || mapaColunas["DATA_ADMISSAO"] || mapaColunas["ADMISSAO"] || 4;
     const colMatricula = mapaColunas["MATRÍCULA"] || mapaColunas["MATRICULA"] || 5;
-    const colVerba = mapaColunas["CÓDIGO VERBA"] || mapaColunas["CODIGO VERBA"] || mapaColunas["VERBA"] || 12;
+    const colTipoFolha = mapaColunas["TIPO DE FOLHA"] || mapaColunas["TIPO_FOLHA"] || mapaColunas["TIPO DE CALCULO"] || 6;
+    const colCodVerba = mapaColunas["CÓDIGO VERBA"] || mapaColunas["CODIGO VERBA"] || mapaColunas["VERBA"] || 12;
+    const colDescVerba = mapaColunas["DESCRIÇÃO VERBA"] || mapaColunas["DESCRICAO VERBA"] || 13;
+    const colNatVerba = mapaColunas["NATUREZA VERBA"] || mapaColunas["NATUREZA_VERBA"] || 14;
+    const colPctVerba = mapaColunas["PERCENTUAL VERBA"] || mapaColunas["PERCENTUAL_VERBA"] || 15;
+    const colQtdRef = mapaColunas["QUANTIDADE REFERÊNCIA"] || mapaColunas["QUANTIDADE REFERENCIA"] || mapaColunas["REFERENCIA"] || 16;
+    const colValorVerba = mapaColunas["VALOR VERBA"] || mapaColunas["VALOR_VERBA"] || mapaColunas["VALOR"] || 17;
+    const colInss = mapaColunas["INCIDÊNCIA INSS"] || mapaColunas["INCIDENCIA INSS"] || mapaColunas["INSS"] || 18;
+    const colIrrf = mapaColunas["INCIDÊNCIA IRRF"] || mapaColunas["INCIDENCIA IRRF"] || mapaColunas["IRRF"] || 19;
+    const colFgts = mapaColunas["INCIDÊNCIA FGTS"] || mapaColunas["INCIDENCIA FGTS"] || mapaColunas["FGTS"] || 20;
 
     const cpfRaw = valorCelula(row.getCell(colCpf).value);
     const cnpjRaw = valorCelula(row.getCell(colCnpj).value);
 
-    // Evita processar linhas fantasmas que o Excel deixa em branco no fim do arquivo
     if (!cpfRaw && !cnpjRaw) return;
 
-    const linha: HoleriteLinha = {
+    dados.push({
       linhaPlanilha: rowNumber,
       cpf: normalizarCPF(cpfRaw),
       cnpj: normalizarCNPJ(cnpjRaw),
       dataAdmissao: normalizarData(valorCelula(row.getCell(colData).value)),
       matricula: normalizarMatricula(valorCelula(row.getCell(colMatricula).value)),
-      codigoVerba: normalizarCodigoVerba(valorCelula(row.getCell(colVerba).value))
-    };
-
-    dados.push(linha);
+      tipoFolha: valorCelula(row.getCell(colTipoFolha).value),
+      codigoVerba: normalizarCodigoVerba(valorCelula(row.getCell(colCodVerba).value)),
+      descricaoVerba: valorCelula(row.getCell(colDescVerba).value),
+      naturezaVerba: valorCelula(row.getCell(colNatVerba).value),
+      percentualVerba: valorCelula(row.getCell(colPctVerba).value),
+      quantidadeReferencia: valorCelula(row.getCell(colQtdRef).value),
+      valorVerba: valorCelula(row.getCell(colValorVerba).value),
+      incidenciaInss: valorCelula(row.getCell(colInss).value),
+      incidenciaFgts: valorCelula(row.getCell(colFgts).value),
+      incidenciaIrrf: valorCelula(row.getCell(colIrrf).value)
+    });
   });
 
   return dados;
 }
 
-/*
-=========================
-RELATÓRIO (BASE CADASTRAL)
-=========================
-*/
 export async function lerRelatorio(file: File): Promise<FuncionarioRelatorio[]> {
-  const buffer = await file.arrayBuffer();
+  const arrayBuffer = await file.arrayBuffer();
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
+  await workbook.xlsx.load(arrayBuffer);
   const sheet = workbook.getWorksheet(1);
 
-  if (!sheet) {
-    throw new Error("Relatório não encontrado.");
-  }
+  if (!sheet) throw new Error("Relatório não encontrado.");
 
   const dados: FuncionarioRelatorio[] = [];
   let mapaColunas: Record<string, number> = {};
@@ -120,7 +101,7 @@ export async function lerRelatorio(file: File): Promise<FuncionarioRelatorio[]> 
     const colData = mapaColunas["DATA ADMISSÃO"] || mapaColunas["DATA_ADMISSAO"] || mapaColunas["ADMISSAO"] || 6;
 
     const cpfRaw = valorCelula(row.getCell(colCpf).value);
-    if (!cpfRaw) return; // Ignora se a linha estiver completamente em branco
+    if (!cpfRaw) return;
 
     dados.push({
       cnpjRegistro: normalizarCNPJ(valorCelula(row.getCell(colCnpj).value)),
@@ -133,20 +114,13 @@ export async function lerRelatorio(file: File): Promise<FuncionarioRelatorio[]> 
   return dados;
 }
 
-/*
-=========================
-DE PARA
-=========================
-*/
 export async function lerDePara(file: File): Promise<DeParaVerba[]> {
-  const buffer = await file.arrayBuffer();
+  const arrayBuffer = await file.arrayBuffer();
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
+  await workbook.xlsx.load(arrayBuffer);
   const sheet = workbook.getWorksheet(1);
 
-  if (!sheet) {
-    throw new Error("De-Para não encontrado.");
-  }
+  if (!sheet) throw new Error("De-Para não encontrado.");
 
   const dados: DeParaVerba[] = [];
   let mapaColunas: Record<string, number> = {};
@@ -158,14 +132,11 @@ export async function lerDePara(file: File): Promise<DeParaVerba[]> {
     }
 
     const colCliente = mapaColunas["CÓDIGO CLIENTE"] || mapaColunas["CODIGO CLIENTE"] || mapaColunas["CODIGO"] || 1;
-    const colWfp = mapaColunas["CÓDIGO WFP"] || mapaColunas["CODIGO WFP"] || mapaColunas["WFP"] || 4;
-
     const codClienteRaw = valorCelula(row.getCell(colCliente).value);
     if (!codClienteRaw) return;
 
     dados.push({
-      codigoCliente: normalizarCodigoVerba(codClienteRaw),
-      codigoWfp: valorCelula(row.getCell(colWfp).value)
+      codigoCliente: normalizarCodigoVerba(codClienteRaw)
     });
   });
 
