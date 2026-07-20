@@ -1,266 +1,173 @@
 import {
-    HoleriteLinha,
-    FuncionarioRelatorio,
-    DeParaVerba,
-    ErroAuditoria
+  HoleriteLinha,
+  FuncionarioRelatorio,
+  DeParaVerba,
+  ErroAuditoria
 } from "./tipos";
 
 import {
-    campoObrigatorio,
-    validarCPF,
-    validarCNPJ,
-    validarData
+  validarCPF,
+  validarCNPJ
 } from "./validadores";
 
-
 function adicionarErro(
-    erros: ErroAuditoria[],
-    linha:number,
-    coluna:string,
-    campo:string,
-    valorEncontrado:string,
-    mensagem:string,
-    categoria:ErroAuditoria["categoria"],
-    valorEsperado?:string
-){
-
-    erros.push({
-        linha,
-        coluna,
-        campo,
-        valorEncontrado,
-        valorEsperado,
-        mensagem,
-        categoria
-    });
-
+  erros: ErroAuditoria[],
+  linha: number,
+  coluna: string,
+  campo: string,
+  valorEncontrado: string,
+  mensagem: string,
+  categoria: ErroAuditoria["categoria"],
+  valorEsperado?: string
+) {
+  erros.push({
+    linha,
+    coluna,
+    campo,
+    valorEncontrado,
+    valorEsperado,
+    mensagem,
+    categoria
+  });
 }
-
-
 
 export function executarAuditoria(
+  holerites: HoleriteLinha[],
+  funcionarios: FuncionarioRelatorio[],
+  dePara: DeParaVerba[]
+): ErroAuditoria[] {
 
-    holerites:HoleriteLinha[],
-    funcionarios:FuncionarioRelatorio[],
-    dePara:DeParaVerba[]
+  const erros: ErroAuditoria[] = [];
 
-):ErroAuditoria[]{
+  const limparCPF = (value: string) => value ? String(value).replace(/\D/g, "") : "";
+  const limparCNPJ = (value: string) => value ? String(value).replace(/[^a-zA-Z0-9]/g, "").toUpperCase() : "";
 
+  // 1. Mapeamento indexado de funcionários cadastrais
+  const funcionariosMap = new Map<string, FuncionarioRelatorio>();
 
-const erros:ErroAuditoria[] = [];
+  funcionarios.forEach(f => {
+    const cpf = limparCPF(f.cpf);
+    const cnpj = limparCNPJ(f.cnpjRegistro);
+    const chave = `${cpf}-${cnpj}`;
 
+    if (cpf) {
+      funcionariosMap.set(chave, {
+        ...f,
+        cpf,
+        cnpjRegistro: cnpj
+      });
+    }
+  });
 
-// CPF + CNPJ é a chave correta
+  // 2. Tabela de Conversão De-Para estruturada como Set de busca veloz
+  const verbas = new Set<string>();
+  dePara.forEach(v => {
+    if (v.codigoCliente) {
+      verbas.add(String(v.codigoCliente).trim().toUpperCase());
+    }
+  });
 
-const funcionariosMap =
-new Map<string,FuncionarioRelatorio>();
+  const funcionariosProcessados = new Set<string>();
 
+  for (const holerite of holerites) {
+    const cpfLimpo = limparCPF(holerite.cpf);
+    const cnpjLimpo = limparCNPJ(holerite.cnpj);
+    const chaveFuncionario = `${cpfLimpo}-${cnpjLimpo}`;
 
-funcionarios.forEach(f=>{
+    // Ignora processamento caso a linha esteja totalmente vazia ou corrompida
+    if (!cpfLimpo && !cnpjLimpo) continue;
 
-    const cpf =
-    f.cpf.replace(/\D/g,"");
+    if (!funcionariosProcessados.has(chaveFuncionario)) {
+      funcionariosProcessados.add(chaveFuncionario);
 
-
-    const cnpj =
-    f.cnpjRegistro.replace(/\D/g,"");
-
-
-    const chave =
-    `${cpf}-${cnpj}`;
-
-
-    funcionariosMap.set(
-        chave,
-        {
-            ...f,
-            cpf,
-            cnpjRegistro:cnpj
-        }
-    );
-
-
-});
-
-
-// DePara
-
-const verbas =
-new Set<string>();
-
-
-dePara.forEach(v=>{
-
-    verbas.add(
-        v.codigoCliente
-    );
-
-});
-
-
-
-// Evita repetir erro do mesmo funcionário
-
-const funcionariosProcessados =
-new Set<string>();
-
-
-
-for(const holerite of holerites){
-
-
-
-const chaveFuncionario =
-`${holerite.cpf.replace(/\D/g,"")}-${holerite.cnpj.replace(/\D/g,"")}`;
-
-
-
-// valida CPF somente uma vez
-
-if(!funcionariosProcessados.has(chaveFuncionario)){
-
-
-    funcionariosProcessados.add(
-        chaveFuncionario
-    );
-
-
-
-    if(!validarCPF(holerite.cpf)){
-
+      if (holerite.cpf && !validarCPF(holerite.cpf)) {
         adicionarErro(
+          erros,
+          holerite.linhaPlanilha,
+          "CPF",
+          "CPF",
+          holerite.cpf,
+          "CPF inválido",
+          "cpf_invalido"
+        );
+      }
+
+      if (holerite.cnpj && !validarCNPJ(holerite.cnpj)) {
+        adicionarErro(
+          erros,
+          holerite.linhaPlanilha,
+          "CNPJ",
+          "CNPJ",
+          holerite.cnpj,
+          "CNPJ inválido",
+          "cnpj_invalido"
+        );
+      }
+
+      const funcionario = funcionariosMap.get(chaveFuncionario);
+
+      if (!funcionario) {
+        adicionarErro(
+          erros,
+          holerite.linhaPlanilha,
+          "CPF/CNPJ",
+          "Funcionário",
+          `CPF: ${holerite.cpf}`,
+          "Funcionário não encontrado cadastrado para este CNPJ",
+          "cpf_nao_encontrado"
+        );
+      } else {
+        const matHolerite = String(holerite.matricula).trim().toUpperCase();
+        const matCadastro = String(funcionario.matricula).trim().toUpperCase();
+
+        if (matHolerite !== matCadastro) {
+          adicionarErro(
             erros,
             holerite.linhaPlanilha,
-            "A",
-            "CPF",
-            holerite.cpf,
-            "CPF inválido",
-            "cpf_invalido"
-        );
-
-    }
-
-
-
-    if(!validarCNPJ(holerite.cnpj)){
-
-
-        adicionarErro(
-            erros,
-            holerite.linhaPlanilha,
-            "B",
-            "CNPJ",
-            holerite.cnpj,
-            "CNPJ inválido",
-            "cnpj_invalido"
-        );
-
-    }
-
-
-
-    const funcionario =
-    funcionariosMap.get(
-        chaveFuncionario
-    );
-
-
-
-    if(!funcionario){
-
-
-        adicionarErro(
-            erros,
-            holerite.linhaPlanilha,
-            "A",
-            "CPF",
-            holerite.cpf,
-            "Funcionário não encontrado para este CNPJ",
-            "cpf_nao_encontrado"
-        );
-
-
-    }
-    else{
-
-
-        if(
-            holerite.matricula !==
+            "Matrícula",
+            "Matrícula",
+            holerite.matricula,
+            "Matrícula divergente",
+            "matricula_divergente",
             funcionario.matricula
-        ){
-
-            adicionarErro(
-                erros,
-                holerite.linhaPlanilha,
-                "E",
-                "Matrícula",
-                holerite.matricula,
-                "Matrícula divergente",
-                "matricula_divergente",
-                funcionario.matricula
-            );
-
+          );
         }
 
+        // Normalização preventiva das strings de data para evitar falsas divergências estruturais
+        const dataH = String(holerite.dataAdmissao).trim();
+        const dataC = String(funcionario.dataAdmissao).trim();
 
-
-        if(
-            holerite.dataAdmissao !==
-            funcionario.dataAdmissao
-        ){
-
-            adicionarErro(
-                erros,
-                holerite.linhaPlanilha,
-                "D",
-                "Data Admissão",
-                holerite.dataAdmissao,
-                "Data de admissão divergente",
-                "admissao_divergente",
-                funcionario.dataAdmissao
-            );
-
-        }
-
-    }
-
-
-}
-
-
-
-
-// DePara
-
-    // DePara
-
-    if(
-        !verbas.has(
-            holerite.codigoVerba
-        )
-    ){
-
-        adicionarErro(
+        if (dataH !== dataC && dataH && dataC) {
+          adicionarErro(
             erros,
             holerite.linhaPlanilha,
-            "L",
-            "Código Verba",
-            holerite.codigoVerba,
-            "Código não encontrado no De-Para",
-            "verba_nao_cadastrada"
-        );
-
+            "Data Admissão",
+            "Data Admissão",
+            holerite.dataAdmissao,
+            "Data de admissão divergente",
+            "admissao_divergente",
+            funcionario.dataAdmissao
+          );
+        }
+      }
     }
 
+    // 3. Validação de Verba de De-Para
+    const codigoVerbaLimpo = String(holerite.codigoVerba).trim().toUpperCase();
 
-} // fecha o for
+    if (codigoVerbaLimpo && !verbas.has(codigoVerbaLimpo)) {
+      adicionarErro(
+        erros,
+        holerite.linhaPlanilha,
+        "Código Verba",
+        "Código Verba",
+        holerite.codigoVerba,
+        "Código de verba não encontrado no mapeamento De-Para",
+        "verba_nao_cadastrada"
+      );
+    }
+  }
 
-console.log(
-    "ERROS GERADOS:",
-    erros
-);
-
-return erros;
-
-
-} // fecha a função executarAuditoria
+  console.log("ERROS GERADOS PROCESSADOS:", erros);
+  return erros;
+}

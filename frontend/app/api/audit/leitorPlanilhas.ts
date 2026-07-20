@@ -1,338 +1,173 @@
 import ExcelJS from "exceljs";
 
 import {
-HoleriteLinha,
-FuncionarioRelatorio,
-DeParaVerba
+  HoleriteLinha,
+  FuncionarioRelatorio,
+  DeParaVerba
 } from "./tipos";
 
 import {
-normalizarCPF,
-normalizarCNPJ,
-normalizarMatricula,
-normalizarCodigoVerba,
-normalizarData
+  normalizarCPF,
+  normalizarCNPJ,
+  normalizarMatricula,
+  normalizarCodigoVerba,
+  normalizarData
 } from "./utils";
 
-
-function valorCelula(
-valor:any
-){
-
-    if(valor === null || valor === undefined){
-        return "";
-    }
-
-
-    if(valor instanceof Date){
-
-        return valor.toISOString();
-
-    }
-
-
-    if(typeof valor === "object" && "text" in valor){
-
-        return valor.text;
-
-    }
-
-
-    return String(valor).trim();
-
+function valorCelula(valor: any): string {
+  if (valor === null || valor === undefined) {
+    return "";
+  }
+  if (valor instanceof Date) {
+    // Retorna no formato YYYY-MM-DD para simplificar normalizações de data
+    return valor.toISOString().split('T')[0];
+  }
+  if (typeof valor === "object" && "text" in valor) {
+    return String(valor.text).trim();
+  }
+  return String(valor).trim();
 }
 
-
+// Auxiliar dinâmico para encontrar os índices reais das colunas pelos nomes
+function mapearCabecalhos(row: ExcelJS.Row): Record<string, number> {
+  const mapa: Record<string, number> = {};
+  row.eachCell((cell, colNumber) => {
+    const nome = String(cell.value || "").toUpperCase().trim();
+    mapa[nome] = colNumber;
+  });
+  return mapa;
+}
 
 /*
 =========================
 HOLERITE
 =========================
 */
+export async function lerHolerite(file: File): Promise<HoleriteLinha[]> {
+  const buffer = await file.arrayBuffer();
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  const sheet = workbook.getWorksheet(1);
 
+  if (!sheet) {
+    throw new Error("Planilha Holerite não encontrada.");
+  }
 
-export async function lerHolerite(
-file:File
-):Promise<HoleriteLinha[]>{
+  const dados: HoleriteLinha[] = [];
+  let mapaColunas: Record<string, number> = {};
 
+  sheet.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) {
+      mapaColunas = mapearCabecalhos(row);
+      return;
+    }
 
-const buffer =
-await file.arrayBuffer();
+    // Identificar dinamicamente as colunas comuns ou mapear por fallback se não achar o nome
+    const colCpf = mapaColunas["CPF"] || 1;
+    const colCnpj = mapaColunas["CNPJ"] || 2;
+    const colData = mapaColunas["DATA ADMISSÃO"] || mapaColunas["DATA_ADMISSAO"] || mapaColunas["ADMISSAO"] || 4;
+    const colMatricula = mapaColunas["MATRÍCULA"] || mapaColunas["MATRICULA"] || 5;
+    const colVerba = mapaColunas["CÓDIGO VERBA"] || mapaColunas["CODIGO VERBA"] || mapaColunas["VERBA"] || 12;
 
+    const cpfRaw = valorCelula(row.getCell(colCpf).value);
+    const cnpjRaw = valorCelula(row.getCell(colCnpj).value);
 
-const workbook =
-new ExcelJS.Workbook();
+    // Evita processar linhas fantasmas que o Excel deixa em branco no fim do arquivo
+    if (!cpfRaw && !cnpjRaw) return;
 
+    const linha: HoleriteLinha = {
+      linhaPlanilha: rowNumber,
+      cpf: normalizarCPF(cpfRaw),
+      cnpj: normalizarCNPJ(cnpjRaw),
+      dataAdmissao: normalizarData(valorCelula(row.getCell(colData).value)),
+      matricula: normalizarMatricula(valorCelula(row.getCell(colMatricula).value)),
+      codigoVerba: normalizarCodigoVerba(valorCelula(row.getCell(colVerba).value))
+    };
 
-await workbook.xlsx.load(buffer);
+    dados.push(linha);
+  });
 
-
-const sheet =
-workbook.getWorksheet(1);
-
-
-if(!sheet){
-
-throw new Error(
-"Planilha Holerite não encontrada."
-);
-
+  return dados;
 }
-
-
-const dados:HoleriteLinha[]=[];
-
-
-
-sheet.eachRow(
-(row,rowNumber)=>{
-
-
-if(rowNumber <= 1)
-return;
-
-
-
-const cpf =
-normalizarCPF(
-valorCelula(
-row.getCell(1).value
-)
-);
-
-
-
-const linha:HoleriteLinha={
-
-
-linhaPlanilha:
-rowNumber,
-
-
-cpf,
-
-
-cnpj:
-normalizarCNPJ(
-valorCelula(
-row.getCell(2).value
-)
-),
-
-
-dataAdmissao:
-normalizarData(
-row.getCell(4).value
-),
-
-
-matricula:
-normalizarMatricula(
-valorCelula(
-row.getCell(5).value
-)
-),
-
-
-codigoVerba:
-normalizarCodigoVerba(
-valorCelula(
-row.getCell(12).value
-)
-)
-
-};
-
-
-
-dados.push(linha);
-
-
-});
-
-
-return dados;
-
-
-}
-
-
-
 
 /*
 =========================
-RELATÓRIO
+RELATÓRIO (BASE CADASTRAL)
 =========================
 */
+export async function lerRelatorio(file: File): Promise<FuncionarioRelatorio[]> {
+  const buffer = await file.arrayBuffer();
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  const sheet = workbook.getWorksheet(1);
 
+  if (!sheet) {
+    throw new Error("Relatório não encontrado.");
+  }
 
-export async function lerRelatorio(
-file:File
-):Promise<FuncionarioRelatorio[]>{
+  const dados: FuncionarioRelatorio[] = [];
+  let mapaColunas: Record<string, number> = {};
 
+  sheet.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) {
+      mapaColunas = mapearCabecalhos(row);
+      return;
+    }
 
-const buffer =
-await file.arrayBuffer();
+    const colCnpj = mapaColunas["CNPJ CADASTRAL"] || mapaColunas["CNPJ REGISTRO"] || mapaColunas["CNPJ"] || 1;
+    const colMatricula = mapaColunas["MATRÍCULA"] || mapaColunas["MATRICULA"] || 3;
+    const colCpf = mapaColunas["CPF"] || 5;
+    const colData = mapaColunas["DATA ADMISSÃO"] || mapaColunas["DATA_ADMISSAO"] || mapaColunas["ADMISSAO"] || 6;
 
+    const cpfRaw = valorCelula(row.getCell(colCpf).value);
+    if (!cpfRaw) return; // Ignora se a linha estiver completamente em branco
 
-const workbook =
-new ExcelJS.Workbook();
+    dados.push({
+      cnpjRegistro: normalizarCNPJ(valorCelula(row.getCell(colCnpj).value)),
+      matricula: normalizarMatricula(valorCelula(row.getCell(colMatricula).value)),
+      cpf: normalizarCPF(cpfRaw),
+      dataAdmissao: normalizarData(valorCelula(row.getCell(colData).value))
+    });
+  });
 
-
-await workbook.xlsx.load(buffer);
-
-
-const sheet =
-workbook.getWorksheet(1);
-
-
-if(!sheet){
-
-throw new Error(
-"Relatório não encontrado."
-);
-
+  return dados;
 }
-
-
-
-const dados:FuncionarioRelatorio[]=[];
-
-
-
-sheet.eachRow(
-(row,rowNumber)=>{
-
-
-if(rowNumber<=1)
-return;
-
-
-
-dados.push({
-
-
-cnpjRegistro:
-normalizarCNPJ(
-valorCelula(
-row.getCell(1).value
-)
-),
-
-
-matricula:
-normalizarMatricula(
-valorCelula(
-row.getCell(3).value
-)
-),
-
-
-cpf:
-normalizarCPF(
-valorCelula(
-row.getCell(5).value
-)
-),
-
-
-dataAdmissao:
-normalizarData(
-row.getCell(6).value
-)
-
-
-});
-
-
-});
-
-
-
-return dados;
-
-
-}
-
-
-
 
 /*
 =========================
 DE PARA
 =========================
 */
+export async function lerDePara(file: File): Promise<DeParaVerba[]> {
+  const buffer = await file.arrayBuffer();
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  const sheet = workbook.getWorksheet(1);
 
+  if (!sheet) {
+    throw new Error("De-Para não encontrado.");
+  }
 
-export async function lerDePara(
-file:File
-):Promise<DeParaVerba[]>{
+  const dados: DeParaVerba[] = [];
+  let mapaColunas: Record<string, number> = {};
 
+  sheet.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) {
+      mapaColunas = mapearCabecalhos(row);
+      return;
+    }
 
-const buffer =
-await file.arrayBuffer();
+    const colCliente = mapaColunas["CÓDIGO CLIENTE"] || mapaColunas["CODIGO CLIENTE"] || mapaColunas["CODIGO"] || 1;
+    const colWfp = mapaColunas["CÓDIGO WFP"] || mapaColunas["CODIGO WFP"] || mapaColunas["WFP"] || 4;
 
+    const codClienteRaw = valorCelula(row.getCell(colCliente).value);
+    if (!codClienteRaw) return;
 
-const workbook =
-new ExcelJS.Workbook();
+    dados.push({
+      codigoCliente: normalizarCodigoVerba(codClienteRaw),
+      codigoWfp: valorCelula(row.getCell(colWfp).value)
+    });
+  });
 
-
-await workbook.xlsx.load(buffer);
-
-
-
-const sheet =
-workbook.getWorksheet(1);
-
-
-
-if(!sheet){
-
-throw new Error(
-"De-Para não encontrado."
-);
-
-}
-
-
-
-const dados:DeParaVerba[]=[];
-
-
-
-sheet.eachRow(
-(row,rowNumber)=>{
-
-
-if(rowNumber<=1)
-return;
-
-
-
-dados.push({
-
-
-codigoCliente:
-normalizarCodigoVerba(
-valorCelula(
-row.getCell(1).value
-)
-),
-
-
-codigoWfp:
-valorCelula(
-row.getCell(4).value
-)
-
-
-});
-
-
-});
-
-
-return dados;
-
-
+  return dados;
 }
