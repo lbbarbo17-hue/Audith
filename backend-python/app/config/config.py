@@ -1,0 +1,7 @@
+GOOGLE_SHEETS = False
+
+GROQ = False
+
+PINTAR_EXCEL = True
+
+PINTAR_GOOGLE = False

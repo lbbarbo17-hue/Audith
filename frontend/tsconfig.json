@@ -30,7 +30,7 @@
     "**/*.mts",
     "**/*.ts",
     "**/*.tsx"
-, "app/api/audit/download.ts"  ],
+, "app/api/audit/export/download.ts"  ],
   "exclude": [
     "node_modules"
   ]
