@@ -1,53 +1,61 @@
-from fastapi import FastAPI
-
+from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+from pathlib import Path
+import shutil
 
-from app.config import APP_NAME, APP_VERSION
+from app.services.auditor import Auditor
 
 app = FastAPI(
-
-    title=APP_NAME,
-
-    version=APP_VERSION
-
+    title="AuditH",
+    version="1.0"
 )
 
+# Permite comunicação com o Next.js
 app.add_middleware(
-
     CORSMiddleware,
-
     allow_origins=["*"],
-
     allow_credentials=True,
-
     allow_methods=["*"],
-
-    allow_headers=["*"]
-
+    allow_headers=["*"],
 )
+
+UPLOAD_DIR = Path("uploads")
+UPLOAD_DIR.mkdir(exist_ok=True)
 
 
 @app.get("/")
-
-def home():
-
+def inicio():
     return {
-
-        "sistema": APP_NAME,
-
-        "versao": APP_VERSION,
-
-        "status": "online"
-
+        "status": "AuditH Online"
     }
 
 
-@app.get("/health")
+@app.post("/auditar")
+async def auditar(
+    holerite: UploadFile = File(...),
+    relatorio: UploadFile = File(...),
+    depara: UploadFile = File(...)
+):
 
-def health():
+    caminho_holerite = UPLOAD_DIR / holerite.filename
+    caminho_relatorio = UPLOAD_DIR / relatorio.filename
+    caminho_depara = UPLOAD_DIR / depara.filename
 
-    return {
+    with open(caminho_holerite, "wb") as buffer:
+        shutil.copyfileobj(holerite.file, buffer)
 
-        "status": "ok"
+    with open(caminho_relatorio, "wb") as buffer:
+        shutil.copyfileobj(relatorio.file, buffer)
 
-    }
+    with open(caminho_depara, "wb") as buffer:
+        shutil.copyfileobj(depara.file, buffer)
+
+    auditoria = Auditor(
+        caminho_holerite,
+        caminho_relatorio,
+        caminho_depara
+    )
+
+    resultado = auditoria.executar()
+
+    return resultado
